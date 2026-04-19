@@ -1,0 +1,29 @@
+name: CI - 系统检查脚本
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:   # 允许手动触发
+
+jobs:
+  run-system-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+
+      - name: 赋予脚本执行权限
+        run: chmod +x scripts/system_check.sh
+
+      - name: 执行系统健康检查脚本
+        run: ./scripts/system_check.sh
+
+      - name: 保存检查结果为 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: system-check-result
+          path: scripts/system_check.sh   # 可以后续扩展保存输出日志
+          retention-days: 7
