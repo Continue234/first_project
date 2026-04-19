@@ -5,7 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:   # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   run-system-check:
@@ -19,11 +19,14 @@ jobs:
         run: chmod +x scripts/system_check.sh
 
       - name: 执行系统健康检查脚本
-        run: ./scripts/system_check.sh
+        run: ./scripts/system_check.sh > system-check-output.txt
+
+      - name: 显示执行结果（方便在日志中查看）
+        run: cat system-check-output.txt
 
       - name: 保存检查结果为 Artifact
         uses: actions/upload-artifact@v4
         with:
           name: system-check-result
-          path: scripts/system_check.sh   # 可以后续扩展保存输出日志
+          path: system-check-output.txt
           retention-days: 7
