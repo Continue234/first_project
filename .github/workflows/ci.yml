@@ -1,4 +1,4 @@
-name: CI - 系统检查脚本
+name: CI - 系统检查脚本增强版（Matrix + Cache + Notify）
 
 on:
   push:
@@ -8,25 +8,60 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-system-check:
-    runs-on: ubuntu-latest
-    
+  system-health-check:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-latest]   # 矩阵：测试两个 Ubuntu 版本
+        include:
+          - os: ubuntu-latest
+            python-version: '3.12'
+      fail-fast: false                      # 某个矩阵失败不立即终止所有任务（推荐生产使用）
+
     steps:
       - name: Checkout 代码
         uses: actions/checkout@v4
 
-      - name: 赋予脚本执行权限
-        run: chmod +x scripts/system_check.sh
+      - name: 缓存 apt 包（加速后续安装）
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt
+          key: ${{ runner.os }}-apt-${{ hashFiles('**/apt-packages.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-
 
-      - name: 执行系统健康检查脚本
-        run: ./scripts/system_check.sh > system-check-output.txt
+      - name: 准备环境
+        run: |
+          sudo apt update && sudo apt install -y nginx curl
+          chmod +x scripts/system_check.sh
 
-      - name: 显示执行结果（方便在日志中查看）
-        run: cat system-check-output.txt
+      - name: 启动 Nginx
+        run: sudo systemctl start nginx
 
-      - name: 保存检查结果为 Artifact
+      - name: 执行系统健康检查
+        run: ./scripts/system_check.sh > check-result.log 2>&1
+
+      - name: 检查 Nginx 状态
+        run: |
+          echo "=== Nginx 状态 ===" >> check-result.log
+          sudo systemctl status nginx --no-pager >> check-result.log 2>&1 || echo "Nginx 服务检查失败" >> check-result.log
+
+      - name: 显示完整结果
+        run: cat check-result.log
+
+      - name: 保存 Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: system-check-result
-          path: system-check-output.txt
+          name: full-system-check-${{ matrix.os }}
+          path: check-result.log
           retention-days: 7
+
+      - name: 磁盘使用率告警
+        run: |
+          DISK_USAGE=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
+          echo "当前根分区使用率: ${DISK_USAGE}%"
+          if [ "${DISK_USAGE}" -gt 80 ]; then
+            echo "❌ 磁盘使用率超过 80%！"
+            exit 1
+          fi
+
