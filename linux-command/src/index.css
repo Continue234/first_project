@@ -1,0 +1,86 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-terminal: #3fb950;
+  --color-surface: #0d1117;
+  --color-surface-light: #161b22;
+  --color-surface-lighter: #21262d;
+  --color-text: #c9d1d9;
+  --color-text-muted: #8b949e;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-surface text-text font-sans antialiased;
+}
+
+::selection {
+  @apply bg-terminal/30 text-white;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-surface-lighter rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-text-muted;
+}
+
+.markdown-body .edit_btn {
+  display: none;
+}
+
+.markdown-body pre {
+  position: relative;
+}
+
+.markdown-body pre code {
+  font-family: var(--font-mono) !important;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+.markdown-body .code-line {
+  display: block;
+  padding-left: 1rem;
+  position: relative;
+}
+
+.markdown-body .line-number::before {
+  content: attr(line);
+  position: absolute;
+  left: -0.5rem;
+  width: 2rem;
+  text-align: right;
+  color: #484f58;
+  font-size: 0.75rem;
+  user-select: none;
+}
+
+.markdown-body .token.comment { color: #8b949e; }
+.markdown-body .token.function { color: #d2a8ff; }
+.markdown-body .token.parameter { color: #ffa657; }
+.markdown-body .token.variable { color: #79c0ff; }
+.markdown-body .token.string { color: #a5d6ff; }
+.markdown-body .token.keyword { color: #ff7b72; }
+.markdown-body .token.number { color: #79c0ff; }
+.markdown-body .token.operator { color: #ff7b72; }
+.markdown-body .token.punctuation { color: #c9d1d9; }
+.markdown-body .token.builtin { color: #ffa657; }
