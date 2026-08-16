@@ -2,15 +2,15 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
       - 'linux-command/**'
       - '.github/workflows/**'
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
       - 'linux-command/**'
-  workflow_dispatch:
+  workflow_dispatch:                # 手动触发
 
 permissions:
   contents: read
@@ -18,11 +18,13 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: "pages-${{ github.ref }}"
   cancel-in-progress: true
 
 jobs:
+  # ==================== 构建 & 质量检查 ====================
   build:
+    name: Build & Quality Check
     runs-on: ubuntu-latest
 
     steps:
@@ -36,6 +38,15 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'linux-command/package-lock.json'
 
+      # 额外缓存 node_modules（加速明显）
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: linux-command/node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('linux-command/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
       - name: 安装依赖
         working-directory: ./linux-command
         run: npm ci
@@ -43,10 +54,25 @@ jobs:
       - name: 运行测试（可选）
         working-directory: ./linux-command
         run: npm test
+        # 没有测试可删除，或加 continue-on-error: true
 
       - name: 构建项目
         working-directory: ./linux-command
         run: npm run build
+        env:
+          # 示例环境变量（非敏感放 Variables，敏感放 Secrets）
+          # VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
+      - name: 检查构建产物
+        run: |
+          echo "检查构建目录："
+          ls -la linux-command/
+          if [ ! -d "linux-command/dist" ]; then
+            echo "错误：linux-command/dist 目录不存在！请确认 build 输出路径。"
+            exit 1
+          fi
+          echo "构建产物存在，内容如下："
+          ls -la linux-command/dist
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5
@@ -54,8 +80,21 @@ jobs:
       - name: 上传构建产物
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./linux-command/dist        # ←←← 如果你的输出目录不是 dist，请修改这里！
+          path: ./linux-command/dist   # 确认这里与实际输出一致
 
+  # ==================== 部署（仅 main 分支真正执行） ====================
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    # 关键：只有 push 到 main 或手动触发才部署，PR 不部署
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
       - name: 部署到 GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
