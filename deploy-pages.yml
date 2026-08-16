@@ -1,0 +1,92 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'linux-command/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'linux-command/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & Quality Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'linux-command/package-lock.json'
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: linux-command/node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('linux-command/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: 安装依赖
+        working-directory: ./linux-command
+        run: npm ci
+
+      # 如果暂时没有 test 脚本，请把下面整个 step 注释掉
+      - name: 运行测试
+        working-directory: ./linux-command
+        run: npm test
+
+      - name: 构建项目
+        working-directory: ./linux-command
+        run: npm run build
+
+      - name: 检查构建产物
+        run: |
+          echo "检查构建目录："
+          ls -la linux-command/
+          if [ ! -d "linux-command/dist" ]; then
+            echo "错误：linux-command/dist 目录不存在！"
+            exit 1
+          fi
+          ls -la linux-command/dist
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: 上传构建产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./linux-command/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
