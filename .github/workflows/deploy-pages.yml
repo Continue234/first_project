@@ -10,7 +10,7 @@ on:
     branches: [main]
     paths:
       - 'linux-command/**'
-  workflow_dispatch:                # 手动触发
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -22,7 +22,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ==================== 构建 & 质量检查 ====================
   build:
     name: Build & Quality Check
     runs-on: ubuntu-latest
@@ -38,7 +37,6 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'linux-command/package-lock.json'
 
-      # 额外缓存 node_modules（加速明显）
       - name: Cache node_modules
         uses: actions/cache@v4
         with:
@@ -51,27 +49,23 @@ jobs:
         working-directory: ./linux-command
         run: npm ci
 
-      - name: 运行测试（可选）
+      # 如果暂时没有 test 脚本，请把下面整个 step 注释掉
+      - name: 运行测试
         working-directory: ./linux-command
         run: npm test
-        # 没有测试可删除，或加 continue-on-error: true
 
       - name: 构建项目
         working-directory: ./linux-command
         run: npm run build
-        env:
-          # 示例环境变量（非敏感放 Variables，敏感放 Secrets）
-          # VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
 
       - name: 检查构建产物
         run: |
           echo "检查构建目录："
           ls -la linux-command/
           if [ ! -d "linux-command/dist" ]; then
-            echo "错误：linux-command/dist 目录不存在！请确认 build 输出路径。"
+            echo "错误：linux-command/dist 目录不存在！"
             exit 1
           fi
-          echo "构建产物存在，内容如下："
           ls -la linux-command/dist
 
       - name: Setup GitHub Pages
@@ -80,14 +74,12 @@ jobs:
       - name: 上传构建产物
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./linux-command/dist   # 确认这里与实际输出一致
+          path: ./linux-command/dist
 
-  # ==================== 部署（仅 main 分支真正执行） ====================
   deploy:
     name: Deploy to GitHub Pages
     needs: build
     runs-on: ubuntu-latest
-    # 关键：只有 push 到 main 或手动触发才部署，PR 不部署
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
 
     environment:
